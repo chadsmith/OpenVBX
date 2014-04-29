@@ -32,12 +32,110 @@ class Details extends User_Controller
 		parent::__construct();
 		$this->section = 'messages';
 		$this->template->write('title', 'Message');
+        $this->load->model('vbx_addressbook_contact');
 	}
 
 	function index($message_id, $action = 'read')
 	{
 		return $this->details($message_id, $action);
 	}
+
+	function thread($thread_number, $action = 'read')
+	{
+		$threads = $this->vbx_message->get_threads($message_options,
+													 $offset,
+													 $max);
+		$thisThread = $threads['threads'][$thread_number];
+		$data = $this->init_view_data();
+		$data['group'] = '';
+		if($thisThread[0]->owner_type == 'group')
+		{
+			if(isset($data['counts'][$thisThread[0]->owner_id])) 
+			{
+				$data['group'] = $data['counts'][$thisThread[0]->owner_id]->name;
+			} 
+			else 
+			{
+				$data['group'] = 'Inbox';
+			}
+		}
+		//print_r($threads);
+		$details = array();
+		foreach ($thisThread as $message) 
+		{
+			//print_r($message);
+			$this->vbx_message->mark_read($message->id, $this->user_id);
+			// $message->pretty_called = format_phone($message->called);
+			// $message->pretty_caller = format_phone($message->caller);
+			$details[] = array(
+				 'id' => $message->id,
+				 'selected_folder' => $this->session->flashdata('selected-folder'),
+				 'selected_folder_id' => $this->session->flashdata('selected-folder-id'),
+				 'status' => $message->status,
+				 'type' => $message->type,
+				 'ticket_status' => $message->ticket_status,
+				 'summary' => $message->content_text,
+				 'assigned' => $message->assigned_to,
+				 'archived' => ($message->status == 'archived')? true : false,
+				 'unread' => ($message->status == 'new')? true : false,
+				 'recording_url' => preg_replace('/http:\/\//', 'https://', $message->content_url),
+				 'recording_length' => format_player_time($message->size),
+				 'received_time' => date('Y-M-d\TH:i:s+00:00', strtotime($message->created)),
+				 'last_updated' => date('Y-M-d\TH:i:s+00:00', strtotime($message->updated)),
+				 'created' => $message->created,
+				 'called' => format_phone($message->called),
+				 'caller' => format_phone($message->caller),
+				 'caller_name' => $this->caller_name($message->caller),
+				 'original_called' => $message->called,
+				 'original_caller' => $message->caller,
+				 'folder' => $data['group'],
+				 'folder_id' => $folder_id,
+				 'message_type' => $message->type,
+				 //'active_users' => $active_users,
+				 'owner_type' => $message->owner_type,
+			);
+		}
+		$data['messages'] = $details;
+
+		foreach($details as $message)
+		{
+			$annotation = $this->vbx_message->get_annotations($message['id']);
+			if (!empty($annotation))
+			{
+				foreach($annotation as $reply)
+				{
+					$reply->created = date('Y-M-d\TH:i:s+00:00', strtotime($reply->created));
+					$annotations[] = (array) $reply;
+				}
+			}
+		}
+		uasort($annotations, 'sort_by_date');
+		$annotations = array_reverse($annotations);
+		$data['annotations'] = $annotations;
+
+		$data['mergedMessages'] = array_merge($data['annotations'], $data['messages']);
+		uasort($data['mergedMessages'], 'sort_by_date_array');
+		$data['mergedMessages'] = array_reverse($data['mergedMessages']);
+
+		$prettyCaller = format_phone($details[0]['caller']);
+		$date = date('M j, Y h:i:s', strtotime($details[0]['created']));
+		$this->respond(' - '.$data['group']. " voicemail from  {$prettyCaller} at {$date} ", 'messages/details', $data);
+	}
+
+
+	function caller_name($caller)
+	{
+        $address_options = array('phone' => str_replace('+1', '', $caller));
+
+        $contact = $this->vbx_addressbook_contact->get_contacts($address_options);
+        if ($contact['total'] == 0) {
+            $fullname = false;
+        } else {
+            $fullname = $contact['addressbook_contacts'][0]->first_name. ' ' .$contact['addressbook_contacts'][0]->last_name;
+        }
+        return $fullname;
+    }
+
 	
 	function details($message_id, $action = 'read')
 	{

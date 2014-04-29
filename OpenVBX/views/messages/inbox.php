@@ -33,15 +33,17 @@
 
 		<table border="0" class="vbx-items-grid">
 			<tbody>
-				<?php foreach($items as $item): ?>
-				<tr rel="<?php echo $item['id'] ?>" class="message-row <?php echo ($item['type']=='sms')? 'sms-type' : 'call-type'?> <?php echo ($item['unread'])? 'unread' : 'read'?>">
+				<?php foreach($threads as $item):
+				$item = $item[0];
+				?>
+				<tr rel="<?php echo $item['original_caller'] ?>" class="message-row <?php echo ($item['type']=='sms')? 'sms-type' : 'call-type'?> <?php echo ($item['unread'])? 'unread' : 'read'?>">
 					<td class="message-select">
 						<div style="padding: 6px">
 							<input type="checkbox" name="message[id][]" value="<?php echo $item['id'] ?>" />
 						</div>
 					</td>
 					<td class="message-caller message-details-link">
-						<span class="phone-number"><?php echo $item['caller'] ?></span>
+						<span class="phone-number"><?php echo ($item['caller_name']) ? $item['caller_name'] : $item['caller']; ?></span>
 						<a href="<?php echo site_url("messages/details/{$item['id']}")?>" class="quick-call-button"><span class="replace"><?php echo $item['caller'] ?></span></a>
 						<?php if($item['type'] == 'sms'): ?>
 						<a href="<?php echo site_url("messages/details/{$item['id']}")?>" class="quick-sms-button"><span class="replace"><?php echo $item['caller'] ?></span></a>
